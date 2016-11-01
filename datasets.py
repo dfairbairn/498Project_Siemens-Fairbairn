@@ -6,7 +6,15 @@ date: October 2016
 Code for acquiring specific game data from our database.
 
 Right now I've just canniablized some of the code from parse.py for
-connecting to the mysql server.
+connecting to the mysql server in case that helps.
+
+***
+Reading up on SQL alchemy, it looks like I need to instead be using session 
+objects to make queries, so the cannibalized code might be not useful. I need
+to read up on what types of classes to create in Python which we pair with the
+query objects!
+***
+
 
 """
 
@@ -23,6 +31,8 @@ import re
 import getopt
 import sys
 
+import sqlalchemy.orm.session as s
+Session = s.sessionmaker()
 
 def connect(config):   
     try:
@@ -49,7 +59,7 @@ def connect(config):
         
     db = sqlalchemy.create_engine(dbString)
     conn = db.connect()
-    
+     
     return conn
 
 
@@ -64,4 +74,5 @@ if __name__=='__main__':
         print('Cannot connect to database: %s' % e)
         raise SystemExit
 
+    sess = s.Session()
     
