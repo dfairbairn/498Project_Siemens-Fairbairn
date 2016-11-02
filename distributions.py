@@ -1,61 +1,88 @@
 import pandas as pd
 import MySQLdb as MySQL
 
+# Logging module might be a handy thing to be using 
+import logging
+
 def db_connect():
     """ Connect to the database """
     mysql_cn = MySQL.connect(host='35.160.8.83', port=3306, user='ubuntu', \
                                         passwd='R3tr0sh33t', db='retrosheet')
     return mysql_cn
 
-def get_all_games(mysql_cn, table='events'):
-    sql = ('select distinct GAME_ID from %s',table) 
-    games_list = pd.read_sql(sql)
+def get_games(mysql_cn, year='2015', team='ANA', table='events'):
+    # using the regexp functionality in mysql we can specify substrings
+    # e.g. for specifying year
+    sql = 'select distinct GAME_ID from %s where GAME_ID regexp %s and HOME_TEAM_ID="%s"' % (table,str(year),team) 
+    games_list = pd.read_sql(sql,mysql_cn)
+
     return games_list   
 
 def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
     """
-    Compute the 
+    Compute the event_ids corresponding to a change of primary pitchers in
+    games of the given list.
+
+    Testing situation: Works! But could be faster. Perhaps we *should* just use
+    the grand single pandas dataframe
 
     """
+    # TODO: Add a team identification to the (event,game) tuples?
+
     pitch_changes = pd.DataFrame(columns=["EVENT_ID","GAME_ID"])
     
-    if games_list==None: 
-        sql = ('select distinct GAME_ID from %s',table) 
-        games_list = pd.read_sql(sql)
- 
- 
+    if type(games_list)==type(None): 
+        sql = 'select distinct GAME_ID from %s' % (table) 
+        games_list = (pd.read_sql(sql,mysql_cn))['GAME_ID']
+    elif type(games_list)==type(pd.DataFrame()):
+        games_list = games_list['GAME_ID']
+    else: 
+        logging.error( "Bad games list input" )
+        return None
+    logging.info( "List of games: " + str(games_list))
+
     pitch_changes=[] # store primary pitcher changes as (EVENT_ID,GAME_ID) tuples)
 
-    for g in games_list:
+    for gameid in games_list:
+        # Ensure we have game id's as strings
+        g = str( gameid )
+        logging.info("Checking Game ID: " + g)
+
         # First, check for a change for the first team
-        sql = ('select EVENT_ID, PIT_ID from %s where BAT_HOME_ID='0' and GAME_ID=%s',table,g)
-        pitches_0 = pd.read_sql(sql)
+        sql = 'select EVENT_ID, PIT_ID from %s where BAT_HOME_ID="0" and GAME_ID="%s"' % (table,g)
+        pitches_0 = pd.read_sql(sql, mysql_cn)
+
         for i in range(len(pitches_0) - 1): 
             # look for first instance of a change of pitchers 
-            if pitches_0['PIT_ID'][i] != pitches_0['PIT_ID'][i+1]
+            if pitches_0['PIT_ID'][i] != pitches_0['PIT_ID'][i+1]:
                 pitch_changes.append( (pitches_0['EVENT_ID'][i+1], g) )
-                print "Found a primary switch: ",str(pitches_0['EVENT_ID'][i+1], g)
+                logging.info("Found a primary switch: ",str(pitches_0['EVENT_ID'][i+1]),str(g))
                 break # Should just break from this inner loop
 
+
         # Next, check for a main pitcher change for the opposition 
-        sql = ('select EVENT_ID, PIT_ID from %s where BAT_HOME_ID='1' and GAME_ID=%s',table,g)
-        pitches_1 = pd.read_sql(sql)
+        sql = 'select EVENT_ID, PIT_ID from %s where BAT_HOME_ID="1" and GAME_ID="%s"' % (table,g)
+        pitches_1 = pd.read_sql(sql, mysql_cn)
+
         for i in range(len(pitches_1) - 1): 
             # look for first instance of a change of pitchers 
-            if pitches_1[PIT_ID][i] != pitches_1[PIT_ID][i+1]
+            if pitches_1['PIT_ID'][i] != pitches_1['PIT_ID'][i+1]:
                 pitch_changes.append( (pitches_1['EVENT_ID'][i+1], g) )
-                print "Found a primary switch: ",str(pitches_1['EVENT_ID'][i+1], g)
+                logging.info("Found a primary switch: ",str(pitches_1['EVENT_ID'][i+1]),str(g))
                 break # Should just break from this inner loop
     
     return pitch_changes 
 
 
 if __name__ == "__main__":
+    """
     mysql_cn = MySQL.connect(host='35.160.8.83', port=3306, user='ubuntu', passwd='R3tr0sh33t', db='retrosheet')
-
     dataframe = pd.read_sql('select * from myevents', mysql_cn)
-
     mysql_cn.close()
-
     print(dataframe)
-    
+    """
+ 
+    mysql_cn = db_connect()
+    gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
+    lst = get_main_pitch_changes(mysql_cn, games_list=gl)
+    print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
