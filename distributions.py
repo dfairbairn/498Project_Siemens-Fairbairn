@@ -52,7 +52,6 @@ def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
     the grand single pandas dataframe
 
     """
-    # TODO: Add a team identification to the (event,game) tuples?
 
     pitch_changes = pd.DataFrame(columns=["EVENT_ID","GAME_ID"])
     
@@ -80,8 +79,8 @@ def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
         for i in range(len(pitches_0) - 1): 
             # look for first instance of a change of pitchers 
             if pitches_0['PIT_ID'][i] != pitches_0['PIT_ID'][i+1]:
-                pitch_changes.append( (pitches_0['EVENT_ID'][i+1], g) )
-                logging.info("Found a primary switch: ",str(pitches_0['EVENT_ID'][i+1]),str(g))
+                pitch_changes.append( (pitches_0['EVENT_ID'][i], g) )
+                logging.info("Found a primary switch: ",str(pitches_0['EVENT_ID'][i]),str(g))
                 break # Should just break from this inner loop
 
 
@@ -92,45 +91,51 @@ def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
         for i in range(len(pitches_1) - 1): 
             # look for first instance of a change of pitchers 
             if pitches_1['PIT_ID'][i] != pitches_1['PIT_ID'][i+1]:
-                pitch_changes.append( (pitches_1['EVENT_ID'][i+1], g) )
-                logging.info("Found a primary switch: ",str(pitches_1['EVENT_ID'][i+1]),str(g))
+                pitch_changes.append( (pitches_1['EVENT_ID'][i], g) )
+                logging.info("Found a primary switch: ",str(pitches_1['EVENT_ID'][i]),str(g))
                 break # Should just break from this inner loop
-    
+   
+    # TODO: output list of pitch changes as a pandas df 
     return pitch_changes 
 
 
-def events_at_eventid(event_id,game_id):
+def events_at_eventid(pchange_df, data):
     """
-    Grab the events preceding an event_id,game_id pair
+    Grab the events preceding each event_id,game_id pair
+    
+    **PARAMS**
+    pchange_df: A pandas dataframe of event_id, game_id's corresponding to 
+                changes of pitchers
+    data:   dataframe of all the events of interest
 
     Events to try to get:
-    - winning/losing score differential for team doing the switch out
-    - #balls in the previous pitch sequence
-    - #on-base-hits in the previous pitch sequence
-    -- [Batter destination arrival]
-    - #outs
-    - Opposition Season Record
-    - inning at the time
-    - RBI/how many runs
-
-    Currently acquiring:
-    - 
+    - winning/losing score differential for team doing the switch out 
+        (HOME_SCORE_CT  - AWAY_SCORE_CT or vice versa)
+    - #balls, #strikes, #outs in the previous pitch sequence
+    - #on-base-hits in the previous pitch sequence (~BAT_DEST_ID ?)
+    - Inning
+    - How many runs allowed (RBI_CT)
+    -- Opposition Season Record?
     """
-    # TODO: validate inputs?
-     
-
+    
     return None
 
 
 if __name__ == "__main__":
-    """
-    mysql_cn = MySQL.connect(host='35.160.8.83', port=3306, user='ubuntu', passwd='R3tr0sh33t', db='retrosheet')
-    dataframe = pd.read_sql('select * from myevents', mysql_cn)
-    mysql_cn.close()
-    print(dataframe)
-    """
- 
+    
     mysql_cn = db_connect()
+    # myevents vs. events - myevents seems to be faster, so maybe its worth 
+    # connecting with mysql and specifying a trimmed down events view
+    dataframe = pd.read_sql('select * from myevents', mysql_cn)
+
+    
+    #dataframe['GAME_ID'].loc[dataframe.isin([l[1] for l in lst])]
+     
+ 
     gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
     lst = get_main_pitch_changes(mysql_cn, games_list=gl)
     print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
+    
+    
+
+
