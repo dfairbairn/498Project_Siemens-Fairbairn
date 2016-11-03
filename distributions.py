@@ -1,3 +1,27 @@
+"""
+file: distributions.py
+authors: David Fairbairn and Kyle Siemens
+date: November 2016
+description: This file contains code for retrieving our data for the CMPT498
+    project on the topic of analyzing the occurrence of switching out the main
+    pitcher in recent MLB games.
+
+
+A function for extracting from the database (event_id,game_id) tuples 
+corresponding to change outs of the primary pitcher, and separate functions 
+*will* take these data and determine aspects of the game state prior to the 
+switch such as:
+- winning/losing score differential for team doing the switch out
+- #balls in the previous pitch sequence
+- #on-base-hits in the previous pitch sequence
+-- [Batter destination arrival]
+- #outs
+- Opposition Season Record
+
+
+"""
+
+
 import pandas as pd
 import MySQLdb as MySQL
 
@@ -72,6 +96,7 @@ def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
                 break # Should just break from this inner loop
     
     return pitch_changes 
+
 
 
 if __name__ == "__main__":
