@@ -17,7 +17,8 @@ switch such as:
 -- [Batter destination arrival]
 - #outs
 - Opposition Season Record
-
+- inning at the time
+- RBI/how many runs
 
 """
 
@@ -97,6 +98,28 @@ def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
     
     return pitch_changes 
 
+
+def events_at_eventid(event_id,game_id):
+    """
+    Grab the events preceding an event_id,game_id pair
+
+    Events to try to get:
+    - winning/losing score differential for team doing the switch out
+    - #balls in the previous pitch sequence
+    - #on-base-hits in the previous pitch sequence
+    -- [Batter destination arrival]
+    - #outs
+    - Opposition Season Record
+    - inning at the time
+    - RBI/how many runs
+
+    Currently acquiring:
+    - 
+    """
+    # TODO: validate inputs?
+     
+
+    return None
 
 
 if __name__ == "__main__":
