@@ -105,7 +105,7 @@ def events_at_eventid(pchange_df, data):
     Grab the events preceding each event_id,game_id pair
     
     **PARAMS**
-    pchange_df: A pandas dataframe of event_id, game_id's corresponding to 
+    pchange_df: A list of event_id, game_id's corresponding to 
                 changes of pitchers
     data:   dataframe of all the events of interest
 
@@ -157,10 +157,11 @@ if __name__ == "__main__":
     dataframe = pd.read_sql('select * from myevents', mysql_cn)
  
     gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
+    
     lst = get_main_pitch_changes(mysql_cn, games_list=gl)
     print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
     
     change_events = events_at_eventid(lst, dataframe)
     plot_events(change_events)
 
-    mysql_cn.close()   
+    #mysql_cn.close()   
