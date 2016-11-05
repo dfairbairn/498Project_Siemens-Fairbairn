@@ -151,6 +151,16 @@ def plot_events(change_events):
     pd.value_counts(score_diffs[0], sort=False).sort_index().plot(kind='bar', title='Score Difference')
     plt.show()
 
+def plot_all_pchanges():
+    """ 
+    In case we want to run the grand computation all at once (and wait 5 min) 
+    """
+    mysql_cn = db_connect()
+    dataframe = pd.read_sql('select * from events', mysql_cn)
+    allpchanges = get_main_pitch_changes(mysql_cn)
+    evs_allpchanges = events_at_eventid(allpchanges,dataframe)
+    plot_events(evs_allpchanges) 
+
 if __name__ == "__main__":
     
     mysql_cn = db_connect()
