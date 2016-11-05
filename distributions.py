@@ -25,6 +25,7 @@ switch such as:
 
 import pandas as pd
 import MySQLdb as MySQL
+import matplotlib.pyplot as plt
 
 # Logging module might be a handy thing to be using 
 import logging
@@ -117,8 +118,35 @@ def events_at_eventid(pchange_df, data):
     - How many runs allowed (RBI_CT)
     -- Opposition Season Record?
     """
+    # Right now: grabs all events just before pitcher change. 
+    # TODO: variable window of n events before window?
+    f = map(lambda x: data.loc[data['GAME_ID'] == x[1]].loc[data['EVENT_ID'] == x[0]].index[0], pchange_df)
+    return data.loc[f]
+
+def plot_events(change_events):
+    """
+    Does bar chart plots of specific event columns in the provided dataframe
     
-    return None
+    Note: A next step might be to find the usual distribution of these events 
+        in a given event ID?
+    """
+    plt.figure()
+    pd.value_counts(change_events['INN_CT'], sort=False).plot(kind='bar', title='Inning')
+    plt.figure()
+    pd.value_counts(change_events['BAT_DEST_ID'], sort=False).plot(kind='bar', title='Batter Destination')
+    plt.figure()
+    pd.value_counts(change_events['RBI_CT'], sort=False).plot(kind='bar', title='RBIs')
+    plt.figure()
+    pd.value_counts(change_events['EVENT_OUTS_CT'], sort=False).plot(kind='bar', title='Outs')
+    plt.figure()
+    pd.value_counts(change_events['PA_BALL_CT'], sort=False).plot(kind='bar', title='Balls')
+
+    home = change_events.loc[change_events['BAT_HOME_ID']==1]['HOME_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==1]['AWAY_SCORE_CT']
+    away = change_events.loc[change_events['BAT_HOME_ID']==0]['AWAY_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==0]['HOME_SCORE_CT']
+    #score_diffs = home.merge(away) # I get issues here because home and away are pandas series objects
+    #pd.value_counts(score_diffs, sort=False).sort_index().plot(kind='bar', title='Score Diff')
+    plt.show()
+
 
 
 if __name__ == "__main__":
@@ -127,15 +155,12 @@ if __name__ == "__main__":
     # myevents vs. events - myevents seems to be faster, so maybe its worth 
     # connecting with mysql and specifying a trimmed down events view
     dataframe = pd.read_sql('select * from myevents', mysql_cn)
-
-    
-    #dataframe['GAME_ID'].loc[dataframe.isin([l[1] for l in lst])]
-     
  
     gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
     lst = get_main_pitch_changes(mysql_cn, games_list=gl)
     print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
     
-    
+    change_events = events_at_eventid(lst, dataframe)
+    plot_events(change_events)
 
-
+    mysql_cn.close()   
