@@ -131,23 +131,25 @@ def plot_events(change_events):
         in a given event ID?
     """
     plt.figure()
-    pd.value_counts(change_events['INN_CT'], sort=False).plot(kind='bar', title='Inning')
+    pd.value_counts(change_events['INN_CT'], sort=False).sort_index().plot(kind='bar', title='Inning')
     plt.figure()
-    pd.value_counts(change_events['BAT_DEST_ID'], sort=False).plot(kind='bar', title='Batter Destination')
+    pd.value_counts(change_events['BAT_DEST_ID'], sort=False).sort_index().plot(kind='bar', title='Batter Destination')
     plt.figure()
-    pd.value_counts(change_events['RBI_CT'], sort=False).plot(kind='bar', title='RBIs')
+    pd.value_counts(change_events['RBI_CT'], sort=False).sort_index().plot(kind='bar', title='RBIs')
     plt.figure()
-    pd.value_counts(change_events['EVENT_OUTS_CT'], sort=False).plot(kind='bar', title='Outs')
+    pd.value_counts(change_events['EVENT_OUTS_CT'], sort=False).sort_index().plot(kind='bar', title='Outs')
     plt.figure()
-    pd.value_counts(change_events['PA_BALL_CT'], sort=False).plot(kind='bar', title='Balls')
+    pd.value_counts(change_events['PA_BALL_CT'], sort=False).sort_index().plot(kind='bar', title='Balls')
 
-    home = change_events.loc[change_events['BAT_HOME_ID']==1]['HOME_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==1]['AWAY_SCORE_CT']
-    away = change_events.loc[change_events['BAT_HOME_ID']==0]['AWAY_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==0]['HOME_SCORE_CT']
-    #score_diffs = home.merge(away) # I get issues here because home and away are pandas series objects
-    #pd.value_counts(score_diffs, sort=False).sort_index().plot(kind='bar', title='Score Diff')
+    home = pd.DataFrame(change_events.loc[change_events['BAT_HOME_ID']==1]['HOME_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==1]['AWAY_SCORE_CT'])
+    away = pd.DataFrame(change_events.loc[change_events['BAT_HOME_ID']==0]['AWAY_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==0]['HOME_SCORE_CT'])
+    #print "Home and Away look like: ",home
+    score_diffs = home.append(away,ignore_index=True) 
+    #print "Type of score_diffs: ",type(score_diffs)
+    #print score_diffs
+    plt.figure()
+    pd.value_counts(score_diffs[0], sort=False).sort_index().plot(kind='bar', title='Score Difference')
     plt.show()
-
-
 
 if __name__ == "__main__":
     
