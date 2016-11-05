@@ -141,7 +141,17 @@ if __name__ == "__main__":
 
     plt.figure()
 
-    pd.value_counts(change_events['INN_CT'], sort=False).plot.bar()
+    pd.value_counts(change_events['INN_CT'], sort=False).plot(kind='bar', title='Inning')
+    pd.value_counts(change_events['BAT_DEST_ID'], sort=False).plot(kind='bar', title='Batter Destination')
+    pd.value_counts(change_events['RBI_CT'], sort=False).plot(kind='bar', title='RBIs')
+    pd.value_counts(change_events['EVENT_OUTS_CT'], sort=False).plot(kind='bar', title='Outs')
+    pd.value_counts(change_events['PA_BALL_CT'], sort=False).plot(kind='bar', title='Balls')
+
+    home = change_events.loc[change_events['BAT_HOME_ID']==1]['HOME_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==1]['AWAY_SCORE_CT']
+    away = change_events.loc[change_events['BAT_HOME_ID']==0]['AWAY_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==0]['HOME_SCORE_CT']
+    score_diffs = home.merge(away)
+    pd.value_counts(score_diffs, sort=False).sort_index().plot(kind='bar', title='Score Diff')
+
 
     plt.show()
 
