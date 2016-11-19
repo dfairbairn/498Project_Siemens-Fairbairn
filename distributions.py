@@ -54,8 +54,6 @@ def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
 
     """
 
-    pitch_changes = pd.DataFrame(columns=["EVENT_ID","GAME_ID"])
-    
     if type(games_list)==type(None): 
         sql = 'select distinct GAME_ID from %s' % (table) 
         games_list = (pd.read_sql(sql,mysql_cn))['GAME_ID']
@@ -67,45 +65,57 @@ def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
     logging.info( "List of games: " + str(games_list))
 
     pitch_changes=[] # store primary pitcher changes as (EVENT_ID,GAME_ID) tuples)
-
+    
     for gameid in games_list:
         # Ensure we have game id's as strings
         g = str( gameid )
         logging.info("Checking Game ID: " + g)
 
         # First, check for a change for the first team
-        sql = 'select EVENT_ID, PIT_ID from %s where BAT_HOME_ID="0" and GAME_ID="%s"' % (table,g)
+        sql = 'select EVENT_ID, PIT_ID, PITCH_SEQ_TX from %s where BAT_HOME_ID="0" and GAME_ID="%s"' % (table,g)
         pitches_0 = pd.read_sql(sql, mysql_cn)
-
+        pitch_counts = 0
         for i in range(len(pitches_0) - 1): 
             # look for first instance of a change of pitchers 
             if pitches_0['PIT_ID'][i] != pitches_0['PIT_ID'][i+1]:
-                pitch_changes.append( (pitches_0['EVENT_ID'][i], g) )
+                pitch_changes.append( (pitches_0['EVENT_ID'][i], g, pitch_counts) )
                 logging.info("Found a primary switch: ",str(pitches_0['EVENT_ID'][i]),str(g))
                 break # Should just break from this inner loop
-
+            else:
+                # len(pitches_0['PITCH_SEQ_TX'][i])
+                pitch_counts += len(pitches_0['PITCH_SEQ_TX'][i])
 
         # Next, check for a main pitcher change for the opposition 
-        sql = 'select EVENT_ID, PIT_ID from %s where BAT_HOME_ID="1" and GAME_ID="%s"' % (table,g)
+        sql = 'select EVENT_ID, PIT_ID, PITCH_SEQ_TX from %s where BAT_HOME_ID="1" and GAME_ID="%s"' % (table,g)
         pitches_1 = pd.read_sql(sql, mysql_cn)
-
+        pitch_counts = 0
         for i in range(len(pitches_1) - 1): 
             # look for first instance of a change of pitchers 
             if pitches_1['PIT_ID'][i] != pitches_1['PIT_ID'][i+1]:
-                pitch_changes.append( (pitches_1['EVENT_ID'][i], g) )
+                pitch_changes.append( (pitches_1['EVENT_ID'][i], g, pitch_counts) )
                 logging.info("Found a primary switch: ",str(pitches_1['EVENT_ID'][i]),str(g))
                 break # Should just break from this inner loop
-   
-    # TODO: output list of pitch changes as a pandas df 
+            else:
+                pitch_counts += len(pitches_0['PITCH_SEQ_TX'][i])
     return pitch_changes 
 
+def get_pitch_counts(events):
+    """ 
+    For the list of events, find the number of pitches performed by pitcher in that game.
 
-def events_at_eventid(pchange_df, data):
+    *** Right now, we accomplish this in get_main_pitch_changes and events_at_eventid, but
+    this function might be necessary if we want the pitch counts for events *other* than the
+    event immediately preceding a pitch change. *** 
+
     """
-    Grab the events preceding each event_id,game_id pair
+    return -1
+
+def events_at_eventid(pchange, data):
+    """
+    Grab the events preceding each event_id,game_id pair.
     
     **PARAMS**
-    pchange_df: A list of event_id, game_id's corresponding to 
+    pchange: A list of event_id, game_id's corresponding to 
                 changes of pitchers
     data:   dataframe of all the events of interest
 
@@ -120,8 +130,29 @@ def events_at_eventid(pchange_df, data):
     """
     # Right now: grabs all events just before pitcher change. 
     # TODO: variable window of n events before window?
-    f = map(lambda x: data.loc[data['GAME_ID'] == x[1]].loc[data['EVENT_ID'] == x[0]].index[0], pchange_df)
-    return data.loc[f]
+    f = map(lambda x: data.loc[data['GAME_ID'] == x[1]].loc[data['EVENT_ID'] == x[0]].index[0], pchange)
+    f = data.loc[f]
+    #pitch_count_df = pd.DataFrame([ [p[0],p[2]] for p in pchange ],columns=['EVENT_ID','PIT_COUNT'])
+    pitch_count_df = pd.DataFrame([ (p[0],p[1],p[2]) for p in pchange], columns=['EVENT_ID','GAME_ID','PIT_COUNT'])
+    print pitch_count_df
+    # Do a join on the events list in f with the pitch count dataframe (join on EVENT_ID)
+    #f_plus_pcount = pd.concat([ f, pitch_count_df ], axis=1)
+    f_plus_pcount = pd.merge(f, pitch_count_df, on=['EVENT_ID','GAME_ID'], how='inner')
+
+    return f_plus_pcount
+
+def parse_pseq(seq):
+    """ 
+    Parse a pitch sequence transcript from Retrosheet's "PITCH_SEQ_TX" event 
+    variable.
+
+    Ignore:    
+    1 2 3 . + > N V
+
+    e.g. 
+    evs = pd.read_sql('select PITCH_SEQ_TX from events where GAME_ID="ANA201505100"',mysql_cn)
+    """     
+    return len(seq)
 
 def plot_events(change_events):
     """
@@ -174,6 +205,6 @@ if __name__ == "__main__":
     print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
     
     change_events = events_at_eventid(lst, dataframe)
-    plot_events(change_events)
+    #plot_events(change_events)
 
     #mysql_cn.close()   
