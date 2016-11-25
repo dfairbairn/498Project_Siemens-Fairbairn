@@ -19,7 +19,6 @@ switch such as:
 - Opposition Season Record
 - inning at the time
 - RBI/how many runs
-
 """
 
 
@@ -29,11 +28,12 @@ import matplotlib.pyplot as plt
 
 # Logging module might be a handy thing to be using 
 import logging
+import timeit
 
 def db_connect():
     """ Connect to the database """
     mysql_cn = MySQL.connect(host='35.160.8.83', port=3306, user='ubuntu', \
-                                        passwd='R3tr0sh33t', db='retrosheet')
+                                        passwd='R3tr0sh33t', db='retrosheet2')
     return mysql_cn
 
 def get_games(mysql_cn, year='2015', team='ANA', table='events'):
@@ -47,8 +47,70 @@ def get_games(mysql_cn, year='2015', team='ANA', table='events'):
 
     return games_list   
 
-def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
+def get_main_pitch_changes(df, games_list=None):
     """
+    Compute the event_ids corresponding to a change of primary pitchers in
+    games of the given list.
+
+    ** PARAMS **
+    df : dataframe containing the games and events of interest
+    [games_list] : can specify a list of game ID's from which to restrict the 
+                    search for pitching changes from the given table
+
+    ** RETURNS **
+    pitch_changes: a list of (event_id, game_id, pitch_counts-before-change) tuples.
+
+                    This list is intended to then be used by a different method
+                    which would grab other events (e.g. ball count) surrounding
+                    the (event_id, game_id)
+
+    """
+    if games_list==None:
+        games_list = dataframe['GAME_ID'].unique()
+    elif type(games_list)==type([]):
+        games_list = dataframe(games_list, columns=['GAME_ID'])
+
+    pitch_changes=[] # store primary pitcher changes as (EVENT_ID,GAME_ID) tuples)
+    
+    for gameid in games_list:
+        # Ensure we have game id's as strings
+
+        g = str( gameid )
+        logging.info("Checking Game ID: " + g)
+
+        # First, check for a change for the first team
+
+        pitches_0 = df.loc[df['BAT_HOME_ID']==0].loc[df['GAME_ID']==g]
+        
+        pitch_counts = 0
+        for i in range(len(pitches_0) - 1): 
+            # look for first instance of a change of pitchers 
+            if pitches_0['PIT_ID'].iloc[i] != pitches_0['PIT_ID'].iloc[i+1]:
+                pitch_changes.append( (pitches_0['EVENT_ID'].iloc[i], g, pitch_counts) )
+                logging.info("Found a primary switch: ",str(pitches_0['EVENT_ID'].iloc[i]),str(g))
+                break # Should just break from this inner loop
+            else:
+                # len(pitches_0['PITCH_SEQ_TX'][i])
+                pitch_counts += parse_pseq(pitches_0['PITCH_SEQ_TX'].iloc[i])
+
+        # Next, check for a main pitcher change for the opposition 
+        pitches_1 = df.loc[df['BAT_HOME_ID']==1].loc[df['GAME_ID']==g]
+        pitch_counts = 0
+        for i in range(len(pitches_1) - 1): 
+            # look for first instance of a change of pitchers 
+            if pitches_1['PIT_ID'].iloc[i] != pitches_1['PIT_ID'].iloc[i+1]:
+                pitch_changes.append( (pitches_1['EVENT_ID'].iloc[i], g, pitch_counts) )
+                logging.info("Found a primary switch: ",str(pitches_1['EVENT_ID'].iloc[i]),str(g))
+                break # Should just break from this inner loop
+            else:
+                pitch_counts += parse_pseq(pitches_1['PITCH_SEQ_TX'].iloc[i])
+    return pitch_changes 
+
+
+def get_main_pitch_changes2(mysql_cn,table='events',games_list=None):
+    """
+    ** Deprecated **
+
     Compute the event_ids corresponding to a change of primary pitchers in
     games of the given list.
 
@@ -114,7 +176,7 @@ def get_main_pitch_changes(mysql_cn,table='events',games_list=None):
                 logging.info("Found a primary switch: ",str(pitches_1['EVENT_ID'][i]),str(g))
                 break # Should just break from this inner loop
             else:
-                pitch_counts += parse_pseq(pitches_0['PITCH_SEQ_TX'][i])
+                pitch_counts += parse_pseq(pitches_1['PITCH_SEQ_TX'][i])
     return pitch_changes 
 
 def get_pitch_counts(events):
@@ -175,14 +237,12 @@ def events_at_eventid(pchange, data, get_pitcount=True, get_scorediff=True):
         #home = (f.loc[f['BAT_HOME_ID']==1]['HOME_SCORE_CT']-f.loc[f['BAT_HOME_ID']==1]['AWAY_SCORE_CT']).as_matrix()
         #away = (f.loc[f['BAT_HOME_ID']==0]['AWAY_SCORE_CT']-f.loc[f['BAT_HOME_ID']==0]['HOME_SCORE_CT']).as_matrix()
         bat_home = f['BAT_HOME_ID'].as_matrix()
-        print "Length of bat_home: ",len(bat_home)
-        print "Length of diff: ",len(diff)
 
         # for i in rows of f (different events) ... if BAT_HOME_ID = 1 we do Home[i] - Away[i], else Away[i] - Home[i]
 
         scorediff_df = pd.DataFrame([ (p[0],p[1],diff[i]) if bat_home[i]==1 else (p[0],p[1],-diff[i]) for i,p in enumerate(pchange)], \
                         columns=['EVENT_ID','GAME_ID','SCORE_DIFF'])
-        print scorediff_df
+        #print scorediff_df
         f = pd.merge(f, scorediff_df, on=['EVENT_ID', 'GAME_ID'], how='inner')
 
     return f
@@ -246,31 +306,51 @@ def doStatsAL(mysql_cn):
     does statistics on them? Covariance matrix???
 
     """
-    events_in_scope = pd.read_sql('select * from myevents', mysql_cn)
+    mysql_cn = db_connect()
+    dataframe = pd.read_sql('select * from myevents', mysql_cn)
+
+    st = timeit.default_timer()    
+    nl_pchanges = get_main_pitch_changes(dataframe)
+    end = timeit.default_timer()
+    nl_pch_events = evets_at_eventid(nl_pchanges, dataframe)
+
     # Extracting the desired columns depends on what we have in the view, so 
     # the below code might be sensitive to change in the DB
-    variables = events_in_scope.iloc[:,['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','HOME_SCORE_CT','AWAY_SCORE_CT','PIT_CT']]
+    variables = nl_pch_events.iloc[:,['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_CT']]
+    print variables.cov()
+
+    variables.to_csv("tmp_variables.csv")
+    dataframe.to_csv("tmp_dataframe.csv")
+    f = open('tmp_timing.txt','w')
+    f.write("Took " + str(end-st) + " seconds to determine changes of primary pitchers within our dataset.")
+    return dataframe,variables 
 
 if __name__ == "__main__":
     mysql_cn = db_connect()
     # myevents vs. events - myevents is noticeably faster, so maybe its worth 
     # continuing to connect with mysql and creating a trimmed down events view
-    dataframe = pd.read_sql('select * from myevents', mysql_cn)
- 
-    gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
-    
-    lst = get_main_pitch_changes(mysql_cn, games_list=gl)
-    print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
-    
-    change_events = events_at_eventid(lst, dataframe)
-    #plot_events(change_events)
 
+    st = timeit.default_timer()    
+    dataframe = pd.read_sql('select * from myevents', mysql_cn)
+    end = timeit.default_timer()
+    print "Accessing events in view: ", end-st
+
+    gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
+    lst = get_main_pitch_changes2(mysql_cn, table='myevents', games_list=gl)
+    print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
+    change_events = events_at_eventid(lst, dataframe)
+
+    doStatsAL(mysql_cn)
+    #plot_events(change_events)
     #mysql_cn.close()   
 
-    sql = 'SELECT PITCH_SEQ_TX FROM events WHERE GAME_ID="KCA200303310"'
-    df = pd.read_sql(sql,mysql_cn)
-    dfm = df.as_matrix()
-    for i in dfm:
-        c = parse_pseq(i[0])
-        print "Sequence: ",i[0],"\tCount: ",c
+#    st = timeit.default_timer()    
+#    nl_pchanges = get_main_pitch_changes(dataframe)
+#    nl_pch_events = events_at_eventid(nl_pchanges, dataframe)
+#    end = timeit.default_timer()
+#    print "Pitch change ID'ing in View: ", end-st
+#    print "List of (event_id, game_id) pairs corresponding to changes of pitcher in view: \n",nl_pchanges
+
+
+
 
