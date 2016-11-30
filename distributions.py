@@ -44,9 +44,8 @@ def get_games(mysql_cn, year='2015', team='ANA', table='events'):
     """
     # using the regexp functionality in mysql we can specify substrings
     # e.g. for specifying year
-    sql = 'select distinct GAME_ID from %s where GAME_ID regexp %s and HOME_TEAM_ID="%s"' % (table,str(year),team) 
-    games_list = pd.read_sql(sql,mysql_cn)
-
+    sql = 'select distinct GAME_ID from %s where GAME_ID regexp "%s" and HOME_TEAM_ID="%s"' % (table,str(year),team) 
+    games_list = pd.read_sql(sql,mysql_cn) 
     return games_list   
 
 def get_main_pitch_changes(df, games_list=None):
@@ -319,7 +318,8 @@ def pchangesAL(dataframe,fnamecsv):
         pwriter = csv.writer(csvfile, delimiter=',',
                             quotechar='|', quoting=csv.QUOTE_MINIMAL)
         for tup in al_pchanges:
-            pwriter.writerow([tup[0]] + [tup[1] + tup[2]])
+            print tup
+            pwriter.writerow([tup[0]] + [tup[1]] + [tup[2]])
         #pwriter.writerows(nl_pchanges) # Would this make the tuples be read as strings later though?
     return al_pchanges
 
@@ -329,17 +329,17 @@ def statsFromAL(dataframe,fnamecsv):
     computes their statistics.
     """
     al_pchanges = []
-    with open(fname) as csvfile:
+    with open(fnamecsv) as csvfile:
         preader = csv.reader(csvfile, delimiter=',', quotechar='|')
         for row in preader:
-            tup = (row[0], row[1], row[2])
-            nl_pchanges.append(tup)
+            tup = (int(row[0]), row[1], int(row[2]))
+            al_pchanges.append(tup)
 
-    nl_pch_events = events_at_eventid(nl_pchanges, dataframe)
+    al_pch_events = events_at_eventid(al_pchanges, dataframe)
 
     # Extracting the desired columns depends on what we have in the view, so 
     # the below code might be sensitive to change in the DB
-    variables = nl_pch_events.iloc[:,['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_CT']]
+    variables = al_pch_events.loc[:][['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT']]
     print variables.cov()
 
     variables.to_csv("./tmp_variables.csv")
@@ -362,10 +362,11 @@ if __name__ == "__main__":
     #change_events = events_at_eventid(lst, dataframe)
 
 
-    dataframe = pd.read_sql('select * from myevents', mysql_cn)
-    fnamecsv = './pchanges_al.csv'
+    dataframe = pd.read_sql('select * from myevents where GAME_ID regexp "ANA" ', mysql_cn)
+    #dataframe = pd.read_sql('select * from myevents', mysql_cn)
+    fnamecsv = './ANA_pchanges.csv'
     al_pchanges =  pchangesAL(dataframe,fnamecsv)
-    df, variables = statsFromAL(dataframe,fnamescsv)
+    df, variables = statsFromAL(dataframe,fnamecsv)
 
     #plot_events(change_events)
     #mysql_cn.close()   
