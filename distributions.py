@@ -30,6 +30,8 @@ import matplotlib.pyplot as plt
 import logging
 import timeit
 
+import csv
+
 def db_connect():
     """ Connect to the database """
     mysql_cn = MySQL.connect(host='35.160.8.83', port=3306, user='ubuntu', \
@@ -300,29 +302,48 @@ def plot_all_pchanges():
     evs_allpchanges = events_at_eventid(allpchanges,dataframe)
     plot_events(evs_allpchanges) 
 
-def doStatsAL(mysql_cn):
+def pchangesAL(dataframe,fnamecsv):
     """
     Grabs all the events within our scope (2001-2013, American League) and
     does statistics on them? Covariance matrix???
 
     """
-    mysql_cn = db_connect()
-    dataframe = pd.read_sql('select * from myevents', mysql_cn)
-
     st = timeit.default_timer()    
-    nl_pchanges = get_main_pitch_changes(dataframe)
+    al_pchanges = get_main_pitch_changes(dataframe)
     end = timeit.default_timer()
-    nl_pch_events = evets_at_eventid(nl_pchanges, dataframe)
+
+    f = open('./tmp_timing.txt','w')
+    f.write("Took " + str(end-st) + " seconds to determine changes of primary pitchers within our dataset.")
+
+    with open(fnamecsv, 'wb') as csvfile:
+        pwriter = csv.writer(csvfile, delimiter=',',
+                            quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        for tup in al_pchanges:
+            pwriter.writerow([tup[0]] + [tup[1] + tup[2]])
+        #pwriter.writerows(nl_pchanges) # Would this make the tuples be read as strings later though?
+    return al_pchanges
+
+def statsFromAL(dataframe,fnamecsv):
+    """
+    Takes a file containing the list of pitch changes and gets the events and 
+    computes their statistics.
+    """
+    al_pchanges = []
+    with open(fname) as csvfile:
+        preader = csv.reader(csvfile, delimiter=',', quotechar='|')
+        for row in preader:
+            tup = (row[0], row[1], row[2])
+            nl_pchanges.append(tup)
+
+    nl_pch_events = events_at_eventid(nl_pchanges, dataframe)
 
     # Extracting the desired columns depends on what we have in the view, so 
     # the below code might be sensitive to change in the DB
     variables = nl_pch_events.iloc[:,['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_CT']]
     print variables.cov()
 
-    variables.to_csv("tmp_variables.csv")
-    dataframe.to_csv("tmp_dataframe.csv")
-    f = open('tmp_timing.txt','w')
-    f.write("Took " + str(end-st) + " seconds to determine changes of primary pitchers within our dataset.")
+    variables.to_csv("./tmp_variables.csv")
+    #dataframe.to_csv("./tmp_dataframe.csv")
     return dataframe,variables 
 
 if __name__ == "__main__":
@@ -330,27 +351,24 @@ if __name__ == "__main__":
     # myevents vs. events - myevents is noticeably faster, so maybe its worth 
     # continuing to connect with mysql and creating a trimmed down events view
 
-    st = timeit.default_timer()    
+
+    #st = timeit.default_timer()    
+    #dataframe = pd.read_sql('select * from myevents', mysql_cn)
+    #end = timeit.default_timer()
+    #print "Accessing events in view: ", end-st
+    #gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
+    #lst = get_main_pitch_changes2(mysql_cn, table='myevents', games_list=gl)
+    #print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
+    #change_events = events_at_eventid(lst, dataframe)
+
+
     dataframe = pd.read_sql('select * from myevents', mysql_cn)
-    end = timeit.default_timer()
-    print "Accessing events in view: ", end-st
+    fnamecsv = './pchanges_al.csv'
+    al_pchanges =  pchangesAL(dataframe,fnamecsv)
+    df, variables = statsFromAL(dataframe,fnamescsv)
 
-    gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
-    lst = get_main_pitch_changes2(mysql_cn, table='myevents', games_list=gl)
-    print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
-    change_events = events_at_eventid(lst, dataframe)
-
-    doStatsAL(mysql_cn)
     #plot_events(change_events)
     #mysql_cn.close()   
-
-#    st = timeit.default_timer()    
-#    nl_pchanges = get_main_pitch_changes(dataframe)
-#    nl_pch_events = events_at_eventid(nl_pchanges, dataframe)
-#    end = timeit.default_timer()
-#    print "Pitch change ID'ing in View: ", end-st
-#    print "List of (event_id, game_id) pairs corresponding to changes of pitcher in view: \n",nl_pchanges
-
 
 
 
