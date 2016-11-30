@@ -364,7 +364,7 @@ if __name__ == "__main__":
 
     dataframe = pd.read_sql('select * from myevents where GAME_ID regexp "ANA" ', mysql_cn)
     #dataframe = pd.read_sql('select * from myevents', mysql_cn)
-    fnamecsv = './ANA_pchanges.csv'
+    fnamecsv = './tmp_ANA_pchanges.csv'
     al_pchanges =  pchangesAL(dataframe,fnamecsv)
     df, variables = statsFromAL(dataframe,fnamecsv)
 
