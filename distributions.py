@@ -311,8 +311,9 @@ def pchangesAL(dataframe,fnamecsv):
     al_pchanges = get_main_pitch_changes(dataframe)
     end = timeit.default_timer()
 
-    f = open('./tmp_timing.txt','w')
-    f.write("Took " + str(end-st) + " seconds to determine changes of primary pitchers within our dataset.")
+    f = open('./tmp_timing.txt','wr')
+    f.write("Took " + str(end-st) + " seconds to determine changes of primary \
+    pitchers corresponding to file name %s." % fnamecsv)
 
     with open(fnamecsv, 'wb') as csvfile:
         pwriter = csv.writer(csvfile, delimiter=',',
@@ -328,30 +329,43 @@ def statsFromAL(dataframe,fnamecsv):
     Takes a file containing the list of pitch changes and gets the events and 
     computes their statistics.
     """
+    import os
     al_pchanges = []
+    tst = []
     with open(fnamecsv) as csvfile:
         preader = csv.reader(csvfile, delimiter=',', quotechar='|')
         for row in preader:
-            tup = (int(row[0]), row[1], int(row[2]))
+            tup = row
             al_pchanges.append(tup)
+            tst.append((int(tup[0]),tup[1],int(tup[2])))
+    logging.info("al_pchanges: \n",al_pchanges[:10])
+    logging.info("tst: \n",tst[:10]) 
 
-    al_pch_events = events_at_eventid(al_pchanges, dataframe)
+    # Extract variables from this particular time
+    st = timeit.default_timer()
+    al_pch_events = events_at_eventid(tst, dataframe)
+    end = timeit.default_timer()
+    
+    # I wanted to include timing data for both methods that perform time-consuming
+    # calculations, so I wrote them to either append or write to file, depending on its presence
+    append_or_write = 'a' if os.path.isfile('./tmp_timing.txt') else 'w'
+    ftiming = open('tmp_timing.txt',append_or_write)
+    ftiming.write('Performing events_at_eventid() for fname=%s took %f seconds.\n' % (fnamecsv, end-st))
+    ftiming.close()
 
     # Extracting the desired columns depends on what we have in the view, so 
     # the below code might be sensitive to change in the DB
     variables = al_pch_events.loc[:][['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT']]
+    variables.to_csv("./tmp_variables.csv")
     print variables.cov()
 
-    variables.to_csv("./tmp_variables.csv")
-    #dataframe.to_csv("./tmp_dataframe.csv")
+
     return dataframe,variables 
 
 if __name__ == "__main__":
     mysql_cn = db_connect()
-    # myevents vs. events - myevents is noticeably faster, so maybe its worth 
-    # continuing to connect with mysql and creating a trimmed down events view
 
-
+    # DEPRECATED USE OF 'get_main_pitch_changes2()' WHICH USES SQL QUERIES
     #st = timeit.default_timer()    
     #dataframe = pd.read_sql('select * from myevents', mysql_cn)
     #end = timeit.default_timer()
@@ -361,15 +375,16 @@ if __name__ == "__main__":
     #print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
     #change_events = events_at_eventid(lst, dataframe)
 
-
     dataframe = pd.read_sql('select * from myevents where GAME_ID regexp "ANA" ', mysql_cn)
-    #dataframe = pd.read_sql('select * from myevents', mysql_cn)
     fnamecsv = './tmp_ANA_pchanges.csv'
     al_pchanges =  pchangesAL(dataframe,fnamecsv)
     df, variables = statsFromAL(dataframe,fnamecsv)
 
-    #plot_events(change_events)
+    #dataframe = pd.read_sql('select * from myevents', mysql_cn)
+    #fnamecsv = './myevents_pchanges.csv'
+    #myev_pchanges = pchangesAL(dataframe,fnamecsv)
+    #df, variables = statsFromAL(dataframe,fnamecsv)
+
+    # Can READ PANDAS DF FROM A CSV LIKE SO:
+    #new_df = pd.read_sql('./tmp_variables.csv')
     #mysql_cn.close()   
-
-
-
