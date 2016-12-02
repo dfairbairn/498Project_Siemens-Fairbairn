@@ -358,8 +358,6 @@ def statsFromAL(dataframe,fnamecsv):
     variables = al_pch_events.loc[:][['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT']]
     variables.to_csv("./tmp_variables.csv")
     print variables.cov()
-
-
     return dataframe,variables 
 
 if __name__ == "__main__":
@@ -376,9 +374,9 @@ if __name__ == "__main__":
     #change_events = events_at_eventid(lst, dataframe)
 
     dataframe = pd.read_sql('select * from myevents where GAME_ID regexp "ANA" ', mysql_cn)
-    fnamecsv = './tmp_ANA_pchanges.csv'
-    al_pchanges =  pchangesAL(dataframe,fnamecsv)
-    df, variables = statsFromAL(dataframe,fnamecsv)
+    #fnamecsv = './tmp_ANA_pchanges.csv'
+    #al_pchanges =  pchangesAL(dataframe,fnamecsv)
+    #df, variables = statsFromAL(dataframe,fnamecsv)
 
     #dataframe = pd.read_sql('select * from myevents', mysql_cn)
     #fnamecsv = './myevents_pchanges.csv'
