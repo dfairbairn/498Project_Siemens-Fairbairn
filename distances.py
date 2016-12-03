@@ -19,7 +19,7 @@ def mahalanobisR(myRow, inData, covariance):
     return(m)
 
 if __name__=="__main__":
-    x = pd.read_csv('tmp_variables.csv')
+    x = pd.read_csv('AL_pchanges_vars.csv')
     x = x.ix[:,1:]
 
     Sx = x.cov().values
