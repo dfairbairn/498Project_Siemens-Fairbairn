@@ -1,5 +1,6 @@
 from sklearn.cluster import KMeans
 from sklearn.metrics.cluster import silhouette_score
+from sklearn.metrics.cluster import calinski_harabaz_score
 import numpy as np
 import pandas as pd
 
@@ -29,7 +30,7 @@ def cluster_study(n=50):
 
     fnamecsv = './AL_pchange_vars.csv'
     df = pd.read_csv(fnamecsv)
-    variables = (df.as_matrix())[:,1:]
+    variables = (df.as_matrix())[:,1:].astype(float)
     for j in range(len(variables[0,:])): #ugly way of looping over columns
         variables[:,j] = ( variables[:,j] - np.mean(variables[:,j]))/np.std(variables[:,j])
 
@@ -54,22 +55,53 @@ def cluster_study(n=50):
     with open('cluster_vs_calharabaz.txt','w') as f:
         for s in scores:
             f.write(str(s[0]) + "\t" + str(s[1]) + "\n")
-   
+
+def plot_cluster_performance(fn_sil='cluster_vs_silhouette.txt', fn_cal='cluster_vs_calharabaz.txt'):
+    """ Plot the cluster performances vs. number of clusters """
+    import matplotlib.pyplot as plt   
+    f_sil = open(fn_sil,'r')
+    pltdata_sil = np.array([ [int(s.split()[0]), float(s.split()[1])] for s in f_sil.readlines()])
+    f_cal = open(fn_cal,'r')
+    pltdata_cal = np.array([ [int(s.split()[0]), float(s.split()[1])] for s in f_cal.readlines()])
+
+    plt.plot(pltdata_sil[:,0],pltdata_sil[:,1])
+    plt.title('Silhouette Score vs. Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Silhouette Score')
+    plt.show()
+
+    plt.figure()
+    plt.plot(pltdata_cal[:,0],pltdata_cal[:,1])
+    plt.title('Calinski-Harabaz Score vs. Number of Clusters')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Calinski-Harabaz Score')
+    plt.show()
+
+def put_in_pandas():
+    fnamecsv = './AL_pchange_vars.csv'
+    tmp_df = pd.read_csv(fnamecsv)
+    normd_vars = (tmp_df.as_matrix()).astype(float)
+    variables = normd_vars.copy() 
+    for j in range(len(normd_vars[0,:])): #ugly way of looping over columns
+        normd_vars[:,j] = ( normd_vars[:,j] - np.mean(normd_vars[:,j]))/np.std(normd_vars[:,j])
+    k = KMeans(n_clusters=3, n_init=100, n_jobs=3).fit(normd_vars)
+    labels_array = np.array([k.labels_])
+    tmp = np.concatenate([variables,labels_array.T],axis=1)
+    df = pd.DataFrame(tmp,columns=['Index','INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT','LABEL'])
+    return df 
 
 if __name__=="__main__":
     #X = np.array([[30, 50, 80,20], [40, 70, 50, 23], [1, 0 ,2, 4], [5,8,8,0]])
     #kmeans = KMeans(n_clusters=2, random_state=0).fit(X)
 
-    #k = try_kmeans('./AL_pchange_vars.csv',n_clusters=2)
-
     fnamecsv = './AL_pchange_vars.csv'
     df = pd.read_csv(fnamecsv)
-    variables = (df.as_matrix())[:,1:]
-    for j in range(len(variables[0,:])): #ugly way of looping over columns
-        variables[:,j] = ( variables[:,j] - np.mean(variables[:,j]))/np.std(variables[:,j])
+#    variables = (df.as_matrix()).astype(float)
+#    for j in range(len(variables[0,:])): #ugly way of looping over columns
+#        variables[:,j] = ( variables[:,j] - np.mean(variables[:,j]))/np.std(variables[:,j])
+#
+#    k = KMeans(n_clusters=3, n_init=100, n_jobs=3).fit(variables)
+#    for l in k.cluster_centers_:
+#        print "Cluster centroid: ",l
 
-    from sklearn.metrics.cluster import calinski_harabaz_score
-    k = KMeans(n_clusters=3, n_init=100, n_jobs=3).fit(variables)
-     
-    for l in k.labels_:
-        print "Cluster centroid: ",l
+    labeled_df = put_in_pandas()
