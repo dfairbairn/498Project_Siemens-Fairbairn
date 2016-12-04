@@ -25,7 +25,7 @@ def try_kmeans(fnamecsv,n_clusters=8):
     print "Cluster centers: ",k.cluster_centers_
     return k
 
-def cluster_study(n=50):
+def cluster_number_study(n=50):
     """ Check out some basic cluster metrics for different cluster sizes. """
 
     fnamecsv = './AL_pchange_vars.csv'
@@ -78,16 +78,23 @@ def plot_cluster_performance(fn_sil='cluster_vs_silhouette.txt', fn_cal='cluster
     plt.show()
 
 def put_in_pandas():
+    """ 
+    Performs clustering on a dataframe in a csv file and returns a dataframe 
+    of the events with their cluster labeling. 
+    """ 
     fnamecsv = './AL_pchange_vars.csv'
     tmp_df = pd.read_csv(fnamecsv)
-    normd_vars = (tmp_df.as_matrix()).astype(float)
+    tmp_df2 = tmp_df.loc[:][['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT']]
+
+    normd_vars = (tmp_df2.as_matrix()).astype(float)
     variables = normd_vars.copy() 
     for j in range(len(normd_vars[0,:])): #ugly way of looping over columns
         normd_vars[:,j] = ( normd_vars[:,j] - np.mean(normd_vars[:,j]))/np.std(normd_vars[:,j])
     k = KMeans(n_clusters=3, n_init=100, n_jobs=3).fit(normd_vars)
     labels_array = np.array([k.labels_])
     tmp = np.concatenate([variables,labels_array.T],axis=1)
-    df = pd.DataFrame(tmp,columns=['Index','INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT','LABEL'])
+
+    df = pd.DataFrame(tmp,columns=['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT','LABEL'])
     return df 
 
 if __name__=="__main__":

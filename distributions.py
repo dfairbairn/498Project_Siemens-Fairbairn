@@ -241,7 +241,7 @@ def events_at_eventid(pchange, data, get_pitcount=True, get_scorediff=True):
 
         # for i in rows of f (different events) ... if BAT_HOME_ID = 1 we do Home[i] - Away[i], else Away[i] - Home[i]
 
-        scorediff_df = pd.DataFrame([ (p[0],p[1],diff[i]) if bat_home[i]==1 else (p[0],p[1],-diff[i]) for i,p in enumerate(pchange)], \
+        scorediff_df = pd.DataFrame([ (p[0],p[1],diff[i]) if bat_home[i]==0 else (p[0],p[1],-diff[i]) for i,p in enumerate(pchange)], \
                         columns=['EVENT_ID','GAME_ID','SCORE_DIFF'])
         #print scorediff_df
         f = pd.merge(f, scorediff_df, on=['EVENT_ID', 'GAME_ID'], how='inner')
@@ -324,7 +324,7 @@ def pchangesAL(dataframe,fnamecsv):
         #pwriter.writerows(nl_pchanges) # Would this make the tuples be read as strings later though?
     return al_pchanges
 
-def statsFromAL(dataframe,fnamecsv):
+def statsFromAL(dataframe,fnamecsv,variables_csv="./tmp_variables.csv"):
     """
     Takes a file containing the list of pitch changes and gets the events and 
     computes their statistics.
@@ -355,23 +355,13 @@ def statsFromAL(dataframe,fnamecsv):
 
     # Extracting the desired columns depends on what we have in the view, so 
     # the below code might be sensitive to change in the DB
-    variables = al_pch_events.loc[:][['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT']]
-    variables.to_csv("./tmp_variables.csv")
+    variables = al_pch_events
+    variables.to_csv(variables_csv)
     print variables.cov()
     return dataframe,variables 
 
 if __name__ == "__main__":
     mysql_cn = db_connect()
-
-    # DEPRECATED USE OF 'get_main_pitch_changes2()' WHICH USES SQL QUERIES
-    #st = timeit.default_timer()    
-    #dataframe = pd.read_sql('select * from myevents', mysql_cn)
-    #end = timeit.default_timer()
-    #print "Accessing events in view: ", end-st
-    #gl = get_games(mysql_cn) # function defaults to just getting Anaheim's home 2015 games
-    #lst = get_main_pitch_changes2(mysql_cn, table='myevents', games_list=gl)
-    #print "List of (event_id, game_id) pairs corresponding to changes of pitcher: \n",lst
-    #change_events = events_at_eventid(lst, dataframe)
 
     dataframe = pd.read_sql('select * from myevents where GAME_ID regexp "ANA" ', mysql_cn)
     #fnamecsv = './tmp_ANA_pchanges.csv'
@@ -379,9 +369,10 @@ if __name__ == "__main__":
     #df, variables = statsFromAL(dataframe,fnamecsv)
 
     #dataframe = pd.read_sql('select * from myevents', mysql_cn)
-    #fnamecsv = './myevents_pchanges.csv'
+    #fnamecsv = './AL_pchanges.csv'
+    #varcsv = './AL_pchange_vars.csv'
     #myev_pchanges = pchangesAL(dataframe,fnamecsv)
-    #df, variables = statsFromAL(dataframe,fnamecsv)
+    #df, variables = statsFromAL(dataframe,fnamecsv,variables_csv=varcsv)
 
     # Can READ PANDAS DF FROM A CSV LIKE SO:
     #new_df = pd.read_sql('./tmp_variables.csv')
