@@ -15,20 +15,22 @@ def findGameWin(gameID, isHome, mysql_cn):
 
 def findGamesWins(p_change_vars, mysql_cn):
     in_p=', '.join(map(lambda x: ("'" + x + "'"), p_change_vars['GAME_ID'].values))
-    sql = 'select * from mygames where GAME_ID in (' + str(in_p) + ')'
+    sql = 'select * from mynewgames where GAME_ID in (' + str(in_p) + ')'
     data = pd.read_sql(sql, mysql_cn)
-
+    
     p_change_vars['TEAM_WINS']=False
-
+    
     print p_change_vars.index
     for i in p_change_vars.index:
-    #for i in range(1,10):
-        row = p_change_vars.ix[i]
+    #for i in range(1,2):
         print i
-        val =  row['PIT_ID']==data.loc[data['GAME_ID']==row['GAME_ID']]['WIN_PIT_ID']
-        row['TEAM_WINS'] = (row['PIT_ID']==data.loc[data['GAME_ID']==row['GAME_ID']]['WIN_PIT_ID']).values[0]
+        row = p_change_vars.ix[i]
+        game = data.loc[data['GAME_ID']==row['GAME_ID']]
+        homeWin = (game['HOME_WIN'] == 1).values[0]
+        homePit = (game['HOME_START_PIT_ID'] == row['PIT_ID']).values[0]
+        row['TEAM_WINS'] = (homePit == homeWin)
         p_change_vars.ix[i] = row
-
+   
     return p_change_vars
 
 
@@ -45,3 +47,10 @@ print f
 #r = df.applymap(lambda x: (x['WIN_PIT_ID'] == x['HOME_START_PIT_ID']))
 
 p_change = pd.read_csv('AL_pchange_vars.csv')
+
+new_p = findGamesWins(p_change, mysql)
+
+in_p=', '.join(map(lambda x: ("'" + x + "'"), p_change['GAME_ID'].values))
+sql = 'select * from mygames where GAME_ID in (' + str(in_p) + ')'
+data = pd.read_sql(sql, mysql)
+
