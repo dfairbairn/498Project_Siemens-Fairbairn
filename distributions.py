@@ -96,9 +96,8 @@ def get_main_pitch_changes(df, games_list=None):
     pitch_changes=[] # store primary pitcher changes as (EVENT_ID,GAME_ID) tuples)
     
     for gameid in games_df['GAME_ID']:
-        print 'Individual gameid: ',gameid
+        #print 'Individual gameid: ',gameid
         # Ensure we have game id's as strings
-
         g = str( gameid )
         logging.info("Checking Game ID: " + g)
 
@@ -158,9 +157,8 @@ def get_pchanges_nback(df, games_list=None,nback=1):
     pitch_changes=[] # store primary pitcher changes as (EVENT_ID,GAME_ID) tuples)
     
     for gameid in games_df['GAME_ID']:
-        print 'Individual gameid: ',gameid
+        #print 'Individual gameid: ',gameid
         # Ensure we have game id's as strings
-
         g = str( gameid )
         logging.info("Checking Game ID: " + g)
 
@@ -214,7 +212,7 @@ def events_at_eventid(pchange, data, get_pitcount=True, get_scorediff=True):
     
     **PARAMS**
     pchange :   A list of event_id, game_id's, and pitch counts corresponding to 
-                changes of pitchers
+                at-bat events close to the time of a change of pitchers
     data :      dataframe of all the events of interest
     [get_pitcount] :    boolean flag denoting whether to attempt to fold in pitch #'s into DF
     [get_scorediff] :   boolean flag denoting whether to attempt to fold in score diffs into DF
@@ -233,35 +231,25 @@ def events_at_eventid(pchange, data, get_pitcount=True, get_scorediff=True):
     - pitch counts -- PIT_CT
     -- Opposition Season Record?
     """
-    # Right now: grabs all events just before pitcher change. 
-    # TODO: variable window of n events before window?
-    #   ========> POSSIBLY ACHIEVED BY LOADING UP THE GET_MAIN_PITCH_CHANGES FUNCTION WITH THIS FUNCTINOALITY
 
     # Grab the events from table 'data' corresponding to game_id, event_id in each row
     f = map(lambda x: data.loc[data['GAME_ID'] == x[1]].loc[data['EVENT_ID'] == x[0]].index[0], pchange)
     f = data.loc[f]
 
     if get_pitcount:
-        #pitch_count_df = pd.DataFrame([ [p[0],p[2]] for p in pchange ],columns=['EVENT_ID','PIT_COUNT'])
         pitch_count_df = pd.DataFrame([ (p[0],p[1],p[2]) for p in pchange], columns=['EVENT_ID','GAME_ID','PIT_COUNT'])
-        print pitch_count_df
+        logging.info(pitch_count_df)
         # Do a join on the events list in f with the pitch count dataframe (join on EVENT_ID)
-        #f_plus_pcount = pd.concat([ f, pitch_count_df ], axis=1)
         f_plus_pcount = pd.merge(f, pitch_count_df, on=['EVENT_ID','GAME_ID'], how='inner')
         f = f_plus_pcount
 
     if get_scorediff:
         #print "Home and Away look like: ",home
         diff = (f['HOME_SCORE_CT'] - f['AWAY_SCORE_CT']).as_matrix()
-        #home = (f.loc[f['BAT_HOME_ID']==1]['HOME_SCORE_CT']-f.loc[f['BAT_HOME_ID']==1]['AWAY_SCORE_CT']).as_matrix()
-        #away = (f.loc[f['BAT_HOME_ID']==0]['AWAY_SCORE_CT']-f.loc[f['BAT_HOME_ID']==0]['HOME_SCORE_CT']).as_matrix()
         bat_home = f['BAT_HOME_ID'].as_matrix()
-
-        # for i in rows of f (different events) ... if BAT_HOME_ID = 1 we do Home[i] - Away[i], else Away[i] - Home[i]
 
         scorediff_df = pd.DataFrame([ (p[0],p[1],diff[i]) if bat_home[i]==0 else (p[0],p[1],-diff[i]) for i,p in enumerate(pchange)], \
                         columns=['EVENT_ID','GAME_ID','SCORE_DIFF'])
-        #print scorediff_df
         f = pd.merge(f, scorediff_df, on=['EVENT_ID', 'GAME_ID'], how='inner')
 
     return f
@@ -298,6 +286,10 @@ def plot_events(change_events):
     pd.value_counts(change_events['EVENT_OUTS_CT'], sort=False).sort_index().plot(kind='bar', title='Outs')
     plt.figure()
     pd.value_counts(change_events['PA_BALL_CT'], sort=False).sort_index().plot(kind='bar', title='Balls')
+    plt.figure()
+    pd.value_counts(change_events['TEAM_WINS'], sort=False).sort_index().plot(kind='bar', title='Team Wins')
+    plt.figure()
+    pd.value_counts(change_events['PIT_COUNT'], sort=False).sort_index().plot(title='Pitch Count')
 
     home = pd.DataFrame(change_events.loc[change_events['BAT_HOME_ID']==1]['HOME_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==1]['AWAY_SCORE_CT'])
     away = pd.DataFrame(change_events.loc[change_events['BAT_HOME_ID']==0]['AWAY_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==0]['HOME_SCORE_CT'])
@@ -319,7 +311,7 @@ def plot_all_pchanges():
     evs_allpchanges = events_at_eventid(allpchanges,dataframe)
     plot_events(evs_allpchanges) 
 
-def pchangesAL(dataframe,fnamecsv):
+def pchangesAL(dataframe,fnamecsv,nback=1):
     """
     Grabs all the events within our scope (2001-2013, American League) and
     does statistics on them? Covariance matrix???
@@ -328,7 +320,10 @@ def pchangesAL(dataframe,fnamecsv):
     fnamecsv is the file to write to.
     """
     st = timeit.default_timer()    
-    al_pchanges = get_main_pitch_changes(dataframe)
+    if nback != 1:
+        al_pchanges = get_pchanges_nback(dataframe,nback=nback)
+    else:
+        al_pchanges = get_main_pitch_changes(dataframe)
     end = timeit.default_timer()
 
     f = open('./tmp_timing.txt','wr')
@@ -339,7 +334,7 @@ def pchangesAL(dataframe,fnamecsv):
         pwriter = csv.writer(csvfile, delimiter=',',
                             quotechar='|', quoting=csv.QUOTE_MINIMAL)
         for tup in al_pchanges:
-            print tup
+            logging.info(tup)
             pwriter.writerow([tup[0]] + [tup[1]] + [tup[2]])
         #pwriter.writerows(nl_pchanges) # Would this make the tuples be read as strings later though?
     return al_pchanges
@@ -377,7 +372,7 @@ def statsFromAL(dataframe,fnamecsv,variables_csv="./tmp_variables.csv"):
     # the below code might be sensitive to change in the DB
     variables = al_pch_events
     variables.to_csv(variables_csv)
-    #print variables.cov()
+    logging.info(variables.cov())
     return variables 
 
 if __name__ == "__main__":
@@ -405,11 +400,15 @@ if __name__ == "__main__":
     if pchanges==[] or type(pchanges)!=type([]) or type(pchanges[0])!=type( (0,'str',0) ):
         print "Failed get_main_pitch_changes() test."
 
-
     # Test get_pchange_nback()
     pchanges_n = get_pchanges_nback(data, games_list=gl,nback=3)
     if pchanges_n==[] or type(pchanges_n)!=type([]) or type(pchanges_n[0])!=type( (0,'str',0) ):
         print "Failed get_pchange_nback() test."
+
+    # Test events_at_eventid()
+    evs = events_at_eventid(pchanges_n, data)
+    if type(evs)!=pd.DataFrame:
+        print "Failed events_at_eventid()."
 
     # Test pchangesAL
     fnamecsv = './tst_ANA_pchanges.csv'
@@ -423,12 +422,15 @@ if __name__ == "__main__":
     pvars =  statsFromAL(data,fnamecsv,variables_csv=varcsv)
     if type(pvars)!=pd.DataFrame or not os.path.isfile(varcsv):
         print "Failed statsFromAL() test."
+    os.system('rm %s' % varcsv)
+    os.system('rm %s' % fnamecsv)
 
-    #dataframe = pd.read_sql('select * from myevents', mysql_cn)
-    #fnamecsv = './AL_pchanges.csv'
-    #varcsv = './AL_pchange_vars.csv'
-    #myev_pchanges = pchangesAL(dataframe,fnamecsv)
-    #variables = statsFromAL(dataframe,fnamecsv,variables_csv=varcsv)
+    dataframe = pd.read_sql('select * from myevents', mysql_cn)
+    plot_events(dataframe)
+    #fnamecsv = './AL_6pchanges.csv'
+    #varcsv = './AL_6pchange_vars.csv'
+    #myev_6pchanges = pchangesAL(dataframe,fnamecsv,nback=6)
+    #variables_6bk = statsFromAL(dataframe,fnamecsv,variables_csv=varcsv)
 
     # Can READ PANDAS DF FROM A CSV LIKE SO:
     #new_df = pd.read_sql('./tmp_variables.csv')

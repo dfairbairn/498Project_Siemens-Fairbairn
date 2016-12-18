@@ -39,18 +39,17 @@ def findPitWin(gameID, pitID, mysql_cn):
     dat = pd.read_sql(sql, mysql_cn)
     return (dat['WIN_PIT_ID'] == pitID)
 
-mysql = MySQL.connect(host='35.160.8.83', port=3306, user='ubuntu', passwd='R3tr0sh33t', db='retrosheet2')
-
-f = findGameWin('WAS201307070', True, mysql)
-print f
-
-#r = df.applymap(lambda x: (x['WIN_PIT_ID'] == x['HOME_START_PIT_ID']))
-
-p_change = pd.read_csv('AL_pchange_vars.csv')
-
-new_p = findGamesWins(p_change, mysql)
-
-in_p=', '.join(map(lambda x: ("'" + x + "'"), p_change['GAME_ID'].values))
-sql = 'select * from mygames where GAME_ID in (' + str(in_p) + ')'
-data = pd.read_sql(sql, mysql)
+if __name__=="__main__":
+    mysql = MySQL.connect(host='35.160.8.83', port=3306, user='ubuntu', passwd='R3tr0sh33t', db='retrosheet2')
+    f = findGameWin('WAS201307070', True, mysql)
+    print f
+    #r = df.applymap(lambda x: (x['WIN_PIT_ID'] == x['HOME_START_PIT_ID']))
+    
+    p_change = pd.read_csv('AL_3pchange_vars.csv')
+    
+    new_p = findGamesWins(p_change, mysql)
+    
+    in_p=', '.join(map(lambda x: ("'" + x + "'"), p_change['GAME_ID'].values))
+    sql = 'select * from mygames where GAME_ID in (' + str(in_p) + ')'
+    data = pd.read_sql(sql, mysql)
 
