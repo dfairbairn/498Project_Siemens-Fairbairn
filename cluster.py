@@ -71,7 +71,7 @@ def put_in_pandas_old(fnamecsv='./AL_pchange_vars.csv'):
     df = pd.DataFrame(tmp,columns=['INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT','LABEL'])
     return df 
 
-def put_in_pandas(fnamecsv='./AL_pchange_vars_wins.csv'):
+def cluster_into_df(fnamecsv='./AL_pchange_vars_wins.csv',kclusters=3):
     """ 
     Performs clustering on a dataframe in a csv file and returns a dataframe 
     of the events with their cluster labeling. 
@@ -83,7 +83,7 @@ def put_in_pandas(fnamecsv='./AL_pchange_vars_wins.csv'):
     normd_vars = (variables.copy()[:,3:]).astype(float) # Leave out the Game ID and Event ID variables
     for j in range(len(normd_vars[0,:])): # Ugly way of looping over columns
         normd_vars[:,j] = ( normd_vars[:,j] - np.mean(normd_vars[:,j]))/np.std(normd_vars[:,j])
-    k = KMeans(n_clusters=3, n_init=100, n_jobs=3).fit(normd_vars)
+    k = KMeans(n_clusters=kclusters, n_init=100, n_jobs=3).fit(normd_vars)
     labels_array = np.array([k.labels_])
     tmp = np.concatenate([variables,labels_array.T],axis=1)
     df = pd.DataFrame(tmp,columns=['GAME_ID','EVENT_ID','TEAM_WINS','INN_CT','RBI_CT','PA_BALL_CT','EVENT_OUTS_CT','BAT_DEST_ID','SCORE_DIFF','PIT_COUNT','LABEL'])
@@ -96,4 +96,4 @@ if __name__=="__main__":
     fnamecsv = './AL_pchange_vars_wins.csv'
     df = pd.read_csv(fnamecsv)
 
-    labeled_df = put_in_pandas(fnamecsv)
+    labeled_df = cluster_into_df(fnamecsv)
