@@ -25,6 +25,8 @@ switch such as:
 import pandas as pd
 import MySQLdb as MySQL
 import matplotlib.pyplot as plt
+import numpy as np
+import os 
 
 # Logging module might be a handy thing to be using 
 import logging
@@ -38,15 +40,33 @@ def db_connect():
                                         passwd='R3tr0sh33t', db='retrosheet2')
     return mysql_cn
 
-def get_games(mysql_cn, year='2015', team='ANA', table='events'):
+def get_games(mysql_cn, year='2013', team='ANA', table='games'):
     """
-    Grab a list of game ID's for a particular year and team from the events table.
+    Grab a list of game ID's for a particular year and team from the games table.
+
+    *Hopefully* will stay in the myevents view.
     """
     # using the regexp functionality in mysql we can specify substrings
     # e.g. for specifying year
     sql = 'select distinct GAME_ID from %s where GAME_ID regexp "%s" and HOME_TEAM_ID="%s"' % (table,str(year),team) 
-    games_list = pd.read_sql(sql,mysql_cn) 
-    return games_list   
+    games_df = pd.read_sql(sql,mysql_cn) 
+    games_arr = games_df.as_matrix()
+    games_list = [ g[0] for g in games_arr[:]]
+    return games_list
+
+def get_data(mysql_cn, games_list=None, table='myevents'):
+    """
+    Little function to use sql to grab events from the myevents frame.
+
+    Can optionally supply a gameslist param to restrict grabbed games 
+    to those corresponding from the given game(s).
+    """
+    events = None
+    for g in games_list:
+        sql = 'select * from %s where GAME_ID="%s"' % (table,g)
+        tmp_df = pd.read_sql(sql,mysql_cn)
+        events = pd.concat( [events, tmp_df],ignore_index=True)
+    return events
 
 def get_main_pitch_changes(df, games_list=None):
     """
@@ -66,14 +86,17 @@ def get_main_pitch_changes(df, games_list=None):
                     the (event_id, game_id)
 
     """
-    if games_list==None:
-        games_list = dataframe['GAME_ID'].unique()
-    elif type(games_list)==type([]):
-        games_list = dataframe(games_list, columns=['GAME_ID'])
+    if type(games_list)==type([]):
+        # If function receives a list, turn it into a games dataframe
+        games_df = pd.DataFrame(games_list, columns=['GAME_ID'])
+    else:
+        # If function receives something else, make games dataframe from scratch
+        games_df = pd.DataFrame(df['GAME_ID'].unique(), columns=['GAME_ID'])
 
     pitch_changes=[] # store primary pitcher changes as (EVENT_ID,GAME_ID) tuples)
     
-    for gameid in games_list:
+    for gameid in games_df['GAME_ID']:
+        print 'Individual gameid: ',gameid
         # Ensure we have game id's as strings
 
         g = str( gameid )
@@ -107,19 +130,14 @@ def get_main_pitch_changes(df, games_list=None):
                 pitch_counts += parse_pseq(pitches_1['PITCH_SEQ_TX'].iloc[i])
     return pitch_changes 
 
-
-def get_main_pitch_changes2(mysql_cn,table='events',games_list=None):
+def get_pchanges_nback(df, games_list=None,nback=1):
     """
-    ** Deprecated **
-
     Compute the event_ids corresponding to a change of primary pitchers in
     games of the given list.
 
     ** PARAMS **
-    mysql_cn : sql connection so that the database can be accessed
-    [table] : string for which table within the database should be queried 
-                for accessing events (could be the name of a view)
-    [games_list] : can specify a list of games from which to restrict the 
+    df : dataframe containing the games and events of interest
+    [games_list] : can specify a list of game ID's from which to restrict the 
                     search for pitching changes from the given table
 
     ** RETURNS **
@@ -129,67 +147,66 @@ def get_main_pitch_changes2(mysql_cn,table='events',games_list=None):
                     which would grab other events (e.g. ball count) surrounding
                     the (event_id, game_id)
 
-
-    Testing situation: Works! But could be faster. Perhaps we *should* just use
-    the grand single pandas dataframe
-
     """
-
-    if type(games_list)==type(None): 
-        sql = 'select distinct GAME_ID from %s' % (table) 
-        games_list = (pd.read_sql(sql,mysql_cn))['GAME_ID']
-    elif type(games_list)==type(pd.DataFrame()):
-        games_list = games_list['GAME_ID']
-    else: 
-        logging.error( "Bad games list input" )
-        return None
-    logging.info( "List of games: " + str(games_list))
+    if type(games_list)==type([]):
+        # If function receives a list, turn it into a games dataframe
+        games_df = pd.DataFrame(games_list, columns=['GAME_ID'])
+    else:
+        # If function receives something else, make games dataframe from scratch
+        games_df = pd.DataFrame(df['GAME_ID'].unique(), columns=['GAME_ID'])
 
     pitch_changes=[] # store primary pitcher changes as (EVENT_ID,GAME_ID) tuples)
     
-    for gameid in games_list:
+    for gameid in games_df['GAME_ID']:
+        print 'Individual gameid: ',gameid
         # Ensure we have game id's as strings
+
         g = str( gameid )
         logging.info("Checking Game ID: " + g)
 
         # First, check for a change for the first team
-        sql = 'select EVENT_ID, PIT_ID, PITCH_SEQ_TX from %s where BAT_HOME_ID="0" and GAME_ID="%s"' % (table,g)
-        pitches_0 = pd.read_sql(sql, mysql_cn)
+
+        pitches_0 = df.loc[df['BAT_HOME_ID']==0].loc[df['GAME_ID']==g]
+        
         pitch_counts = 0
         for i in range(len(pitches_0) - 1): 
             # look for first instance of a change of pitchers 
-            if pitches_0['PIT_ID'][i] != pitches_0['PIT_ID'][i+1]:
-                pitch_changes.append( (pitches_0['EVENT_ID'][i], g, pitch_counts) )
-                logging.info("Found a primary switch: ",str(pitches_0['EVENT_ID'][i]),str(g))
+            if pitches_0['PIT_ID'].iloc[i] != pitches_0['PIT_ID'].iloc[i+1]:
+                logging.info("Found a primary switch: ",str(pitches_0['EVENT_ID'].iloc[i]),str(g))
+                # Found a pitch switch. Now take events 'nback' backwards from there.
+                for j in range(nback):
+                    # Some edge cases pitch changes might occur so close to the beginning
+                    # of the game that e.g. 3 back would be before the game started. So we check.
+                    k = i-j
+                    if k >= 0:
+                        # If we look 1, then 2, then 3 events before a pitch change, then the 
+                        # corresponding pitch count here will be pitch_counts-1, pitch_counts-2, ...
+                        pitch_changes.append( (pitches_0['EVENT_ID'].iloc[k], g, pitch_counts-j) )
                 break # Should just break from this inner loop
             else:
                 # len(pitches_0['PITCH_SEQ_TX'][i])
-                pitch_counts += parse_pseq(pitches_0['PITCH_SEQ_TX'][i])
+                pitch_counts += parse_pseq(pitches_0['PITCH_SEQ_TX'].iloc[i])
 
         # Next, check for a main pitcher change for the opposition 
-        sql = 'select EVENT_ID, PIT_ID, PITCH_SEQ_TX from %s where BAT_HOME_ID="1" and GAME_ID="%s"' % (table,g)
-        pitches_1 = pd.read_sql(sql, mysql_cn)
+        pitches_1 = df.loc[df['BAT_HOME_ID']==1].loc[df['GAME_ID']==g]
         pitch_counts = 0
         for i in range(len(pitches_1) - 1): 
             # look for first instance of a change of pitchers 
-            if pitches_1['PIT_ID'][i] != pitches_1['PIT_ID'][i+1]:
-                pitch_changes.append( (pitches_1['EVENT_ID'][i], g, pitch_counts) )
-                logging.info("Found a primary switch: ",str(pitches_1['EVENT_ID'][i]),str(g))
+            if pitches_1['PIT_ID'].iloc[i] != pitches_1['PIT_ID'].iloc[i+1]:
+                logging.info("Found a primary switch: ",str(pitches_1['EVENT_ID'].iloc[i]),str(g))
+                # Found a pitch switch. Now take events 'nback' backwards from there.
+                for j in range(nback):
+                    # Some edge cases pitch changes might occur so close to the beginning
+                    # of the game that e.g. 3 back would be before the game started. So we check.
+                    k = i-j
+                    if k >= 0:
+                        # If we look 1, then 2, then 3 events before a pitch change, then the 
+                        # corresponding pitch count here will be pitch_counts-1, pitch_counts-2, ...
+                        pitch_changes.append( (pitches_1['EVENT_ID'].iloc[k], g, pitch_counts-j) )
                 break # Should just break from this inner loop
             else:
-                pitch_counts += parse_pseq(pitches_1['PITCH_SEQ_TX'][i])
+                pitch_counts += parse_pseq(pitches_1['PITCH_SEQ_TX'].iloc[i])
     return pitch_changes 
-
-def get_pitch_counts(events):
-    """ 
-    For the list of events, find the number of pitches performed by pitcher in that game.
-
-    *** Right now, we accomplish this in get_main_pitch_changes and events_at_eventid, but
-    this function might be necessary if we want the pitch counts for events *other* than the
-    event immediately preceding a pitch change. *** 
-
-    """
-    return -1
 
 def events_at_eventid(pchange, data, get_pitcount=True, get_scorediff=True):
     """
@@ -218,6 +235,7 @@ def events_at_eventid(pchange, data, get_pitcount=True, get_scorediff=True):
     """
     # Right now: grabs all events just before pitcher change. 
     # TODO: variable window of n events before window?
+    #   ========> POSSIBLY ACHIEVED BY LOADING UP THE GET_MAIN_PITCH_CHANGES FUNCTION WITH THIS FUNCTINOALITY
 
     # Grab the events from table 'data' corresponding to game_id, event_id in each row
     f = map(lambda x: data.loc[data['GAME_ID'] == x[1]].loc[data['EVENT_ID'] == x[0]].index[0], pchange)
@@ -305,7 +323,9 @@ def pchangesAL(dataframe,fnamecsv):
     """
     Grabs all the events within our scope (2001-2013, American League) and
     does statistics on them? Covariance matrix???
-
+    
+    dataframe contains events. 
+    fnamecsv is the file to write to.
     """
     st = timeit.default_timer()    
     al_pchanges = get_main_pitch_changes(dataframe)
@@ -357,22 +377,58 @@ def statsFromAL(dataframe,fnamecsv,variables_csv="./tmp_variables.csv"):
     # the below code might be sensitive to change in the DB
     variables = al_pch_events
     variables.to_csv(variables_csv)
-    print variables.cov()
-    return dataframe,variables 
+    #print variables.cov()
+    return variables 
 
 if __name__ == "__main__":
+    # I have some minimal tests of each function we can run to ensure validity.
+
+    # Test db_connect()
     mysql_cn = db_connect()
 
-    dataframe = pd.read_sql('select * from myevents where GAME_ID regexp "ANA" ', mysql_cn)
-    #fnamecsv = './tmp_ANA_pchanges.csv'
-    #al_pchanges =  pchangesAL(dataframe,fnamecsv)
-    #df, variables = statsFromAL(dataframe,fnamecsv)
+    # Test get_games()
+    gl = get_games(mysql_cn) # Use defaults to select the Anaheim games subset
+    if type(gl)!=type([]) or type(gl[0])!=type('This'):
+        print "Failed get_games() test."
+    gl = gl[:2] # Make our search space substantially smaller for subsequent tests' speed.
+   
+    # Test get_data
+    data = get_data(mysql_cn, games_list=gl)
+    if type(data)!=pd.DataFrame:
+        print "Failed get_data() test."
+
+    # Test get_main_pitch_changes() 
+    pchanges = get_main_pitch_changes(data,games_list=gl)
+    if pchanges==[] or type(pchanges)!=type([]) or type(pchanges[0])!=type( (0,'str',0) ):
+        print "Failed get_main_pitch_changes() test."
+    pchanges = get_main_pitch_changes(data)
+    if pchanges==[] or type(pchanges)!=type([]) or type(pchanges[0])!=type( (0,'str',0) ):
+        print "Failed get_main_pitch_changes() test."
+
+
+    # Test get_pchange_nback()
+    pchanges_n = get_pchanges_nback(data, games_list=gl,nback=3)
+    if pchanges_n==[] or type(pchanges_n)!=type([]) or type(pchanges_n[0])!=type( (0,'str',0) ):
+        print "Failed get_pchange_nback() test."
+
+    # Test pchangesAL
+    fnamecsv = './tst_ANA_pchanges.csv'
+    alpch =  pchangesAL(data,fnamecsv)
+    if alpch==[] or type(alpch)!=type([]) or type(alpch[0])!=type( (0,'str',0) ) or not os.path.isfile(fnamecsv):
+        print "Failed pchangesAL() test."
+
+    # Test statsAL
+    fnamecsv = './tst_ANA_pchanges.csv'
+    varcsv = './tst_ANA_vars.csv'
+    pvars =  statsFromAL(data,fnamecsv,variables_csv=varcsv)
+    if type(pvars)!=pd.DataFrame or not os.path.isfile(varcsv):
+        print "Failed statsFromAL() test."
 
     #dataframe = pd.read_sql('select * from myevents', mysql_cn)
     #fnamecsv = './AL_pchanges.csv'
     #varcsv = './AL_pchange_vars.csv'
     #myev_pchanges = pchangesAL(dataframe,fnamecsv)
-    #df, variables = statsFromAL(dataframe,fnamecsv,variables_csv=varcsv)
+    #variables = statsFromAL(dataframe,fnamecsv,variables_csv=varcsv)
 
     # Can READ PANDAS DF FROM A CSV LIKE SO:
     #new_df = pd.read_sql('./tmp_variables.csv')
