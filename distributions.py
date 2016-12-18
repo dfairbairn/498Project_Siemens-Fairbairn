@@ -277,7 +277,7 @@ def plot_events(change_events):
         in a given event ID?
     """
     plt.figure()
-    pd.value_counts(change_events['INN_CT'], sort=False).sort_index().plot(kind='bar', title='Inning')
+    pd.value_counts(change_events['INN_CT'], sort=False).sort_index().plot(title='Inning')
     plt.figure()
     pd.value_counts(change_events['BAT_DEST_ID'], sort=False).sort_index().plot(kind='bar', title='Batter Destination')
     plt.figure()
@@ -286,10 +286,11 @@ def plot_events(change_events):
     pd.value_counts(change_events['EVENT_OUTS_CT'], sort=False).sort_index().plot(kind='bar', title='Outs')
     plt.figure()
     pd.value_counts(change_events['PA_BALL_CT'], sort=False).sort_index().plot(kind='bar', title='Balls')
-    plt.figure()
-    pd.value_counts(change_events['TEAM_WINS'], sort=False).sort_index().plot(kind='bar', title='Team Wins')
-    plt.figure()
-    pd.value_counts(change_events['PIT_COUNT'], sort=False).sort_index().plot(title='Pitch Count')
+#    plt.figure()
+#    pd.value_counts(change_events['PIT_COUNT'], sort=False).sort_index().plot(title='Pitch Count')
+#    plt.figure()
+#    pd.value_counts(change_events['TEAM_WINS'], sort=False).sort_index().plot(kind='bar', title='Pitch Count')
+
 
     home = pd.DataFrame(change_events.loc[change_events['BAT_HOME_ID']==1]['HOME_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==1]['AWAY_SCORE_CT'])
     away = pd.DataFrame(change_events.loc[change_events['BAT_HOME_ID']==0]['AWAY_SCORE_CT']-change_events.loc[change_events['BAT_HOME_ID']==0]['HOME_SCORE_CT'])
@@ -298,7 +299,7 @@ def plot_events(change_events):
     #print "Type of score_diffs: ",type(score_diffs)
     #print score_diffs
     plt.figure()
-    pd.value_counts(score_diffs[0], sort=False).sort_index().plot(kind='bar', title='Score Difference')
+    pd.value_counts(score_diffs[0], sort=False).sort_index().plot(title='Score Difference')
     plt.show()
 
 def plot_all_pchanges():
