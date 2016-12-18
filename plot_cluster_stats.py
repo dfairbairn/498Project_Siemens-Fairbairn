@@ -1,5 +1,19 @@
+"""
+file: 'plot_cluster_stats.py'
+authors: David Fairbairn and Kyle Siemens
+date: December 2016
+
+Some convenient methods for plotting cluster data.
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
+
+def plot_save_init():
+    import os
+    if not os.path.isdir('./cluster_characterization'):
+        print 'Creating an output directory for the images..'
+        os.system('mkdir ./cluster_characterization')
 
 def plot_clusterstats(labeled_vars):
     """ """
@@ -12,6 +26,16 @@ def plot_clusterstats(labeled_vars):
     print "Number in cluster 1: ",len(labeled_vars.loc[labeled_vars['LABEL']==1.0])
     print "Number in cluster 2: ",len(labeled_vars.loc[labeled_vars['LABEL']==2.0])
 
+    plot_score_diff(labeled_vars)
+    plot_pit_count(labeled_vars)
+    plot_inning(labeled_vars)
+    plot_rbi(labeled_vars)
+    plot_balls(labeled_vars)
+    plot_outs(labeled_vars)
+    plot_team_wins(labeled_vars)
+    plot_bat_dest_id(labeled_vars)
+
+    """
     # *********************************
     # ******* SCORE DIFF PLOT *********
     # *********************************
@@ -174,5 +198,93 @@ def plot_clusterstats(labeled_vars):
     plt.ylabel('Number of Occurrences')
     plt.savefig('./cluster_characterization/outcomes_cluster2.png')
     plt.gcf().clear()
+    """
+   
+def plot_bat_dest_id(labeled_vars):
+    plot_save_init()
+    for i in labeled_vars['LABEL'].unique():
+        pd.value_counts(labeled_vars.loc[labeled_vars['LABEL']==float(i)]['BAT_DEST_ID']).sort_index().plot(kind='bar',label='Cluster %s' % str(i))
+        plt.title('Batter Destination (Base #) for Cluster %s' % str(i))
+        plt.xlabel('Batter Destination (Base #)')
+        plt.ylabel('Number of Occurrences')
+        plt.savefig('./cluster_characterization/cluster%s_BATDEST.png' % str(i))
+        plt.gcf().clear()
 
-    
+def plot_balls(labeled_vars):
+    plot_save_init()
+    for i in labeled_vars['LABEL'].unique():
+        pd.value_counts(labeled_vars.loc[labeled_vars['LABEL']==float(i)]['PA_BALL_CT']).sort_index().plot(kind='bar',label='Cluster %s' % str(i))
+        plt.title('Ball Count Distribution for Cluster %s' % str(i))
+        plt.xlabel('Ball Count')
+        plt.ylabel('Number of Occurrences')
+        plt.savefig('./cluster_characterization/cluster%s_BALL.png' % str(i))
+        plt.gcf().clear()
+
+def plot_outs(labeled_vars):
+    plot_save_init()
+    for i in labeled_vars['LABEL'].unique():
+        pd.value_counts(labeled_vars.loc[labeled_vars['LABEL']==float(i)]['EVENT_OUTS_CT']).sort_index().plot(kind='bar',label='Cluster %s' % str(i))
+        plt.title('Outs Count Distribution for Cluster %s' % str(i))
+        plt.xlabel('Outs Count')
+        plt.ylabel('Number of Occurrences')
+        plt.savefig('./cluster_characterization/cluster%s_OUT.png' % str(i))
+        plt.gcf().clear()
+
+def plot_rbi(labeled_vars):
+    plot_save_init()
+    for i in labeled_vars['LABEL'].unique():
+        pd.value_counts(labeled_vars.loc[labeled_vars['LABEL']==float(i)]['RBI_CT']).sort_index().plot(kind='bar',label='Cluster %s' % str(i))
+        plt.title('RBI Count Distribution for Cluster %s' % str(i))
+        plt.xlabel('RBI Count')
+        plt.ylabel('Number of Occurrences')
+        plt.savefig('./cluster_characterization/cluster%s_RBI.png' % str(i))
+        plt.gcf().clear()
+
+def plot_team_wins(labeled_vars):
+    plot_save_init()
+    for i in labeled_vars['LABEL'].unique():
+        pd.value_counts(labeled_vars.loc[labeled_vars['LABEL']==float(i)]['TEAM_WINS']).sort_index().plot(kind='bar',label='Cluster %s' % str(i))
+        plt.title('Win Distribution for Cluster %s' % str(i))
+        plt.xlabel('Loss or Win')
+        plt.ylabel('Number of Occurrences')
+        plt.savefig('./cluster_characterization/outcomes_cluster%s.png' % str(i))
+        plt.gcf().clear()
+
+def plot_score_diff(labeled_vars):
+    plot_save_init()
+    for i in labeled_vars['LABEL'].unique():
+        pd.value_counts(labeled_vars.loc[labeled_vars['LABEL']==float(i)]['SCORE_DIFF']).sort_index().plot(label='Cluster %s' % str(i))
+    plt.legend()
+    plt.title('Score Difference vs. Cluster')
+    plt.xlabel('Score Difference')
+    plt.ylabel('Number of Occurrences')
+    plt.savefig('./cluster_characterization/cluster_scorediff.png')
+    plt.gcf().clear()
+
+def plot_pit_count(labeled_vars):
+    plot_save_init()
+    for i in labeled_vars['LABEL'].unique():
+        pd.value_counts(labeled_vars.loc[labeled_vars['LABEL']==float(i)]['PIT_COUNT']).sort_index().plot(label='Cluster %s' % str(i))
+    plt.legend()
+    plt.title('Pitch Count vs. Cluster')
+    plt.xlabel('Pitch Count')
+    plt.ylabel('Number of Occurrences')
+    plt.savefig('./cluster_characterization/cluster_pitchcount.png')
+    plt.gcf().clear()
+
+def plot_inning(labeled_vars):
+    plot_save_init()
+    for i in labeled_vars['LABEL'].unique():
+        pd.value_counts(labeled_vars.loc[labeled_vars['LABEL']==float(i)]['INN_CT']).sort_index().plot(label='Cluster %s' % str(i))
+    plt.legend()
+    plt.title('Inning Count vs. Cluster')
+    plt.xlabel('Inning')
+    plt.ylabel('Number of Occurrences')
+    plt.savefig('./cluster_characterization/cluster_inning.png')
+    plt.gcf().clear()
+
+if __name__=="__main__":
+    from cluster import *
+    fnamecsv = './AL_pchange_vars_wins.csv'
+    lbldf = cluster_into_df(fnamecsv)
+    plot_clusterstats(lbldf)
