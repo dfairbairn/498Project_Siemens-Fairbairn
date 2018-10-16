@@ -36,8 +36,9 @@ import csv
 
 def db_connect():
     """ Connect to the database """
-    mysql_cn = MySQL.connect(host='35.160.8.83', port=3306, user='ubuntu', \
-                                        passwd='R3tr0sh33t', db='retrosheet2')
+    # TODO:
+    # mysql_cn = MySQL.connect(host='35.160.8.83', port=3306, user='____', \
+    #                                     passwd='______', db='retrosheet2')
     return mysql_cn
 
 def get_games(mysql_cn, year='2013', team='ANA', table='games'):
